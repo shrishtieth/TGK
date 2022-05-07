@@ -505,7 +505,7 @@ contract TaxDistributionContrac is  Ownable {
     }
 
 
-    function swapTokensForEth(uint256 tokenAmount) public {
+    function swapTokensForEth(uint256 tokenAmount) private {
        
         address[] memory path = new address[](2);
         path[0] = TGKToken;
