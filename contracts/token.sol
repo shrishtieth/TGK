@@ -28,8 +28,9 @@ contract TGKToken is ERC20, Ownable {
     uint256 public sellTax = 7500;
     address public taxDistributionContract = 0x50Ca1fde29D62292a112A72671E14a5d4f05580f;
     mapping(address => bool) public excludedFromTax;
-    uint256 public maxBuy = 20000000000000000000000000;
-    uint256 public maxSell = 20000000000000000000000000;
+    uint256 public maxBuy = 7500000000000000000000000;
+    uint256 public maxSell = 7500000000000000000000000;
+    uint256 public maxHolding = 20000000000000000000000000;
     address public automatedMarketMakerPairsContract;
     mapping(address => bool) public isBlacklisted;
 
@@ -44,6 +45,7 @@ contract TGKToken is ERC20, Ownable {
     event automatedMarketMakerPairsContractUpdated(address automatedMarketMakerPairs);
     event TaxDistributionContractUpdated(address taxDistributionContract);
     event TokenAirDropped(address user, uint256 amount);
+    event MaxHoldingUpdated(uint256 max);
 
     constructor()  ERC20("The Gamble Kingdom", "TGK") {
         _mint(msg.sender, 1000000000000000000000000000);
@@ -98,6 +100,11 @@ contract TGKToken is ERC20, Ownable {
         emit TaxDistributionContractUpdated(_taxDistributionContract);
     }
 
+    function updateMaximumHolding(uint256 max) external onlyOwner{
+        maxHolding = max;
+        emit MaxHoldingUpdated(max);
+    }
+
     function airdropTokens(address[] memory users, uint256[] memory amount) external onlyOwner{
         require(users.length == amount.length,"Invalid input");
         uint256 total = users.length;
@@ -117,6 +124,7 @@ contract TGKToken is ERC20, Ownable {
     ) internal virtual override{   
         require(isBlacklisted[sender]!= true || isBlacklisted[recipient]!= true,"Address Blacklisted");   
             if(sender == automatedMarketMakerPairsContract && (excludedFromTax[sender]==false && excludedFromTax[recipient] == false)){
+                require(balanceOf(recipient)+amount <= maxHolding,"Maximum Holding Amount Exceeded");
                 require(amount <= maxBuy,"Amount exceeds the Max Buy Value");
                 uint256 taxAmount= amount*(buyTax)/(100000);
                 super._transfer(sender,taxDistributionContract,taxAmount);
