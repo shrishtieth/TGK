@@ -43,7 +43,7 @@ contract TGKToken is ERC20, Ownable {
     event sellTaxUpdated(uint256 tax);
     event automatedMarketMakerPairsContractUpdated(address automatedMarketMakerPairs);
     event TaxDistributionContractUpdated(address taxDistributionContract);
-    event TokenAirDropped();
+    event TokenAirDropped(address user, uint256 amount);
 
     constructor()  ERC20("The Gamble Kingdom", "TGK") {
         _mint(msg.sender, 1000000000000000000000000000);
@@ -103,8 +103,9 @@ contract TGKToken is ERC20, Ownable {
         uint256 total = users.length;
         for(uint256 i=0; i< total ; i++){
             _transfer(msg.sender, users[i], amount[i]);
+            emit TokenAirDropped(users[i], amount[i]);
         }
-        emit TokenAirDropped();
+ 
     }
 
     
