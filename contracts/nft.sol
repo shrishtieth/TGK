@@ -1276,9 +1276,9 @@ contract TGKNft is Ownable, ERC721A, ReentrancyGuard {
   event MoneyWithdrawn(uint256 amount);
 
   constructor(
-   
+   string memory baseURI
   ) ERC721A("Azuki", "AZUKI", 5, 5200) {
-    
+    _baseTokenURI = baseURI;
   }
 
 
@@ -1296,7 +1296,7 @@ contract TGKNft is Ownable, ERC721A, ReentrancyGuard {
       numberMinted(msg.sender) + quantity <= maxPerAddressDuringMint,
       "can not mint this many"
     );
-    require(msg.value >= quantity * publicSalePrice,"Enter correct Amount");
+    require(msg.value >= quantity * publicSalePrice,"Enter correct Amount"); // we don't want transactions to fail if price sent is higher
     _safeMint(msg.sender, quantity);
     refundIfOver(publicSalePrice * quantity);
     emit PublicSaleMinted(msg.sender, quantity);
