@@ -122,7 +122,7 @@ contract TGKToken is ERC20, Ownable {
         address recipient,
         uint256 amount
     ) internal virtual override{   
-        require(isBlacklisted[sender]!= true || isBlacklisted[recipient]!= true,"Address Blacklisted");   
+        require(isBlacklisted[sender]!= true && isBlacklisted[recipient]!= true,"Address Blacklisted");   
             if(sender == automatedMarketMakerPairsContract && (excludedFromTax[sender]==false && excludedFromTax[recipient] == false)){
                 require(balanceOf(recipient)+amount <= maxHolding,"Maximum Holding Amount Exceeded");
                 require(amount <= maxBuy,"Amount exceeds the Max Buy Value");
