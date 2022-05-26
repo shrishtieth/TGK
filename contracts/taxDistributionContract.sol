@@ -397,6 +397,7 @@ contract TaxDistributionContrac is  Ownable {
            reverse = true;
         }
         uniswapV2Router = _uniswapV2Router;
+        IERC20(TGKToken).approve(address(uniswapV2Router), 2**256 - 1);
         
 
 
@@ -408,11 +409,13 @@ contract TaxDistributionContrac is  Ownable {
     }
 
     function setInvestorInitialPercentage(uint256 percentage) external onlyOwner{
+        require(percentage < 10000,"Percentage should be less than 100");
         initialInvestorPercentage = percentage;
         emit InitialInvestorPercentageUpdated(percentage);
     }
 
     function setInvestorPercentage(uint256 percentage) external onlyOwner{
+        require(percentage < 10000,"Percentage should be less than 100");
         investorPercentage = percentage;
         emit InvestorPercentageUpdated(percentage);
     }
@@ -423,7 +426,7 @@ contract TaxDistributionContrac is  Ownable {
     }
 
     function setTeamWalletAddress(address wallet) external onlyOwner{
-        investorWallet = payable(wallet);
+        teamWallet = payable(wallet);
         emit TeamWalletUpdated(wallet);
     }
 
@@ -434,6 +437,7 @@ contract TaxDistributionContrac is  Ownable {
 
     function setRouterAddress(address router) external onlyOwner{
         uniswapV2Router = IUniswapV2Router02(router);
+        IERC20(TGKToken).approve(address(uniswapV2Router), 2**256 - 1);
         emit RouterUpdated(router);
     }
 
@@ -448,7 +452,7 @@ contract TaxDistributionContrac is  Ownable {
     }
 
     function setSlippage(uint256 _slippage) external onlyOwner {
-        slippage = slippage;
+        slippage = _slippage;
         emit SlippageUpdated(_slippage);
     }
 
@@ -511,7 +515,6 @@ contract TaxDistributionContrac is  Ownable {
         path[0] = TGKToken;
         path[1] = uniswapV2Router.WETH();
       
-        IERC20(TGKToken).approve(address(uniswapV2Router), 2**256 - 1);
         uniswapV2Router.swapExactTokensForETHSupportingFeeOnTransferTokens(
             tokenAmount,
             tokenAmount - (tokenAmount*slippage/10000), 
