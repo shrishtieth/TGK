@@ -355,21 +355,21 @@ interface IUniswapV2Router02 is IUniswapV2Router01 {
 }
 
 contract TaxDistributionContrac is  Ownable {
-    uint256 public investorAmountThreshold = 70000000000000000000;
-    uint256 public amountDistributedToInvestors;
-    uint256 initialInvestorPercentage = 5000;
-    uint256 investorPercentage = 2500;
-    uint256 public priceImpactMax  = 200;
-    uint256 public slippage =10000;
-    uint256 public epoch = 28800;
-    uint256 public lastDistributedTime;
-    address  payable public  investorWallet = payable(0x50Ca1fde29D62292a112A72671E14a5d4f05580f);
-    address  payable public teamWallet = payable(0x50Ca1fde29D62292a112A72671E14a5d4f05580f);
-    address public TGKToken;
-    uint256 public amountDistributedToTeam;
-    bool public reverse;
-    IUniswapV2Router02 public uniswapV2Router;
-    IUniswapV2Pair public pairContract  ;
+    uint256 public investorAmountThreshold = 70000000000000000000; //amount after which investor percentage will change 
+    uint256 public amountDistributedToInvestors;// total amount sent to the investor
+    uint256 initialInvestorPercentage = 5000; // 50% sent to the investor
+    uint256 investorPercentage = 2500; // After 70 eth, 25% will be sent to the investor
+    uint256 public priceImpactMax  = 200; //2% price impact is allowed
+    uint256 public slippage =10000; // Slippage while swapping tokens on dex
+    uint256 public epoch = 28800; // epoch time for tax distribution
+    uint256 public lastDistributedTime; // last time the tax got distributed
+    address  payable public  investorWallet = payable(0x50Ca1fde29D62292a112A72671E14a5d4f05580f); // investor wallet
+    address  payable public teamWallet = payable(0x50Ca1fde29D62292a112A72671E14a5d4f05580f); // team wallet
+    address public TGKToken; //tgk token address
+    uint256 public amountDistributedToTeam; // amount distributed to the team
+    bool public reverse; // token order in pair
+    IUniswapV2Router02 public uniswapV2Router; // uniswap dex router
+    IUniswapV2Pair public pairContract  ; // tgk eth pair contract
     
 
     // events
@@ -385,6 +385,11 @@ contract TaxDistributionContrac is  Ownable {
     event SlippageUpdated(uint256 slippage);
     event EpochUpdated(uint256 epoch);
     event ReverseUpdated(bool reverse);
+
+    /*
+    @param token Address of tgk token
+    @param pair TGK -ETH Pair Address
+     */
 
     constructor(address token, address pair) {
 
@@ -403,16 +408,28 @@ contract TaxDistributionContrac is  Ownable {
 
     }
 
+     /*
+    @param amount updated investor threshold Amount
+     */
+
     function setInvestorThresholdAmount(uint256 amount) external onlyOwner{
         investorAmountThreshold = amount;
         emit InvestorAmountThresholdUpdated(amount);
     }
+
+     /*
+    @param percentage initial percentage to the investor before threshold
+     */
 
     function setInvestorInitialPercentage(uint256 percentage) external onlyOwner{
         require(percentage < 10000,"Percentage should be less than 100");
         initialInvestorPercentage = percentage;
         emit InitialInvestorPercentageUpdated(percentage);
     }
+    
+     /*
+    @param percentage  percentage to the investor after threshold
+     */
 
     function setInvestorPercentage(uint256 percentage) external onlyOwner{
         require(percentage < 10000,"Percentage should be less than 100");
@@ -420,20 +437,36 @@ contract TaxDistributionContrac is  Ownable {
         emit InvestorPercentageUpdated(percentage);
     }
 
+     /*
+    @param wallet investor wallet address
+     */
+
     function setInvestorWalletAddress(address wallet) external onlyOwner{
         investorWallet = payable(wallet);
         emit InvestorWalletUpdated(wallet);
     }
+
+     /*
+    @param wallet team wallet address
+     */
 
     function setTeamWalletAddress(address wallet) external onlyOwner{
         teamWallet = payable(wallet);
         emit TeamWalletUpdated(wallet);
     }
 
+     /*
+    @param token tgk token address
+     */
+
     function setTGKAddress(address token) external onlyOwner{
         TGKToken = token;
         emit TokenContractUpdated(token);
     }
+
+     /*
+    @param router dex router address address
+     */
 
     function setRouterAddress(address router) external onlyOwner{
         uniswapV2Router = IUniswapV2Router02(router);
@@ -441,30 +474,54 @@ contract TaxDistributionContrac is  Ownable {
         emit RouterUpdated(router);
     }
 
+     /*
+    @param pair TGK-ETH pair address
+     */
+
     function setPairAddress(address pair) external onlyOwner{
         pairContract = IUniswapV2Pair(pair);
         emit PairUpdated(pair);
     }
+
+     /*
+    @param max maximum price impact
+     */
 
     function setPriceImpactMx(uint256 max) external onlyOwner{
         priceImpactMax = max;
         emit PriceImpactMaxUpdated(max);
     }
 
+     /*
+    @param _slippage slippage while swapping
+     */
+
     function setSlippage(uint256 _slippage) external onlyOwner {
         slippage = _slippage;
         emit SlippageUpdated(_slippage);
     }
+
+     /*
+    @param rev order of token in pair address
+     */
 
     function setReverse(bool rev) external onlyOwner{
         reverse = rev;
         emit ReverseUpdated(rev);
     }
 
+     /*
+    @param _epoch time for distributing tax
+     */
+
     function updateEpoch(uint256 _epoch) external onlyOwner{
         epoch = _epoch;
         emit EpochUpdated(_epoch);
     }
+
+     /*
+    @param amountA amount of Token swapped on router
+     */
 
     function calcPairSwap(uint256 amountA) public view returns(uint256 priceImpact) {
         if(reverse == true){
@@ -480,6 +537,10 @@ contract TaxDistributionContrac is  Ownable {
         }
         return( priceImpact);    
     }
+
+     /*
+    @param amount distribute amount as Eth
+     */
 
     function distributeTax(uint256 amount) external {
         require(block.timestamp >= epoch + lastDistributedTime,"Epoch Time not completed");
@@ -508,6 +569,9 @@ contract TaxDistributionContrac is  Ownable {
 
     }
 
+     /*
+    @param tokenAmount amount swapped on dex
+     */
 
     function swapTokensForEth(uint256 tokenAmount) private {
        
@@ -526,10 +590,19 @@ contract TaxDistributionContrac is  Ownable {
     
     receive() external payable {}
 
+     /*
+    @param token address of token to be withdrawn
+    @param wallet wallet that gets the token
+     */
+
     function withdrawTokens(IERC20 token, address wallet) external onlyOwner{
          uint256 balanceOfContract = token.balanceOf(address(this));
         token.transfer(wallet,balanceOfContract);
     }
+
+     /*
+    @param wallet address that gets the Eth
+     */
     
     function withdrawFunds(address wallet) external onlyOwner{
         uint256 balanceOfContract = address(this).balance;
