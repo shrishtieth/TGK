@@ -24,15 +24,15 @@ interface IUniswapV2Factory {
 }
 
 contract TGKToken is ERC20, Ownable {
-    uint256 public buyTax = 7500;
-    uint256 public sellTax = 7500;
-    address public taxDistributionContract = 0x50Ca1fde29D62292a112A72671E14a5d4f05580f;
-    mapping(address => bool) public excludedFromTax;
-    uint256 public maxBuy = 7500000000000000000000000;
-    uint256 public maxSell = 7500000000000000000000000;
-    uint256 public maxHolding = 20000000000000000000000000;
-    address public automatedMarketMakerPairsContract;
-    mapping(address => bool) public isBlacklisted;
+    uint256 public buyTax = 7500; //Tax fee deducted when bought on Uniswap
+    uint256 public sellTax = 7500;  //Tax fee deducted when sold on Uniswap
+    address public taxDistributionContract = 0x50Ca1fde29D62292a112A72671E14a5d4f05580f; // tax Distribution contract
+    mapping(address => bool) public excludedFromTax; //Address excluded from tax free 
+    uint256 public maxBuy = 7500000000000000000000000; // maximum amount that can be bought
+    uint256 public maxSell = 7500000000000000000000000; // maximum amount that can be sold
+    uint256 public maxHolding = 20000000000000000000000000; // maximum amount that can be held by an address
+    address public automatedMarketMakerPairsContract; // pair address
+    mapping(address => bool) public isBlacklisted; // checks if an address is blacklisted
 
     // events
     event TokenBurnt(address wallet, uint256 amount);
@@ -60,50 +60,78 @@ contract TGKToken is ERC20, Ownable {
 
 
     }
+
+    // burn the tokens from a wallet
     
     function burn(address account, uint256 amount) external onlyOwner {
         _burn(account, amount);
         emit TokenBurnt(account, amount);
     }
 
+    // update excluded from Tax for a wallet
+
     function updateWalletFee(address wallet, bool isExcluded) external onlyOwner{
         excludedFromTax[wallet] = isExcluded;
         emit WalletFeeUpdated(wallet, isExcluded);
     }
+
+    // updated blacklisted condition of a wallet
 
     function updateBlacklist(address wallet, bool _isBlacklisted) external onlyOwner{
         isBlacklisted[wallet] = _isBlacklisted;
         emit BlacklistAddressUpdated(wallet, _isBlacklisted);
     }
 
+    // Update maximum amount that can be bought
+
     function updateMaxBuy(uint256 _maxBuy) external onlyOwner{
         maxBuy = _maxBuy;
         emit MaxBuyUpdated(_maxBuy);
     }
 
+    // Update maximum amount that can be sold
+
     function updateMaxSell(uint256 _maxSell) external onlyOwner{
         maxSell = _maxSell;
         emit MaxSellUpdated(_maxSell);
     }
+
+     // update buy tax
+
     function updateBuyTax(uint256 tax) external onlyOwner{
         buyTax = tax;
         emit buyTaxUpdated(tax);
     }
+
+    // update sell tax
+
+    function updatSellTax(uint256 tax) external onlyOwner{
+        sellTax = tax;
+        emit sellTaxUpdated(tax);
+    }
+
+    // update tgk eth pair
 
     function updateautomatedMarketMakerPairsContract(address _automatedMarketMakerPairs) external onlyOwner{
         automatedMarketMakerPairsContract = _automatedMarketMakerPairs;
         emit automatedMarketMakerPairsContractUpdated(_automatedMarketMakerPairs);
     }
 
+    // update tax Distribution address
+
     function updateTaxDistributionContract(address _taxDistributionContract) external onlyOwner{
         taxDistributionContract = _taxDistributionContract;
         emit TaxDistributionContractUpdated(_taxDistributionContract);
     }
 
+    // update maximum holding limit of a wallet
+
     function updateMaximumHolding(uint256 max) external onlyOwner{
         maxHolding = max;
         emit MaxHoldingUpdated(max);
     }
+
+    // airdrop tokens
 
     function airdropTokens(address[] memory users, uint256[] memory amount) external onlyOwner{
         require(users.length == amount.length,"Invalid input");
@@ -115,7 +143,7 @@ contract TGKToken is ERC20, Ownable {
  
     }
 
-    
+    // transfer tokens 
 
     function _transfer(
         address sender,
