@@ -522,6 +522,8 @@ contract TaxDistributionContrac is  Ownable {
      /*
     @param amountA amount of Token swapped on router
      */
+   
+        
 
     function calcPairSwap(uint256 amountA) public view returns(uint256 priceImpact) {
         if(reverse == true){
@@ -549,23 +551,20 @@ contract TaxDistributionContrac is  Ownable {
         uint256 initialBalance = address(this).balance;
         swapTokensForEth(amount);
         uint256 newBalance = address(this).balance-(initialBalance);
+        uint256 investorAmount;
         if(amountDistributedToInvestors <= investorAmountThreshold){
-         uint256 investorAmount = (newBalance*initialInvestorPercentage)/10000;
-         investorWallet.transfer(investorAmount);
-         amountDistributedToInvestors = amountDistributedToInvestors + investorAmount;
-         uint256 amountLeft = newBalance-investorAmount;
-         teamWallet.transfer(amountLeft);
-         amountDistributedToTeam = amountDistributedToTeam + amountLeft;
+          investorAmount = (newBalance*initialInvestorPercentage)/10000;
+         
         }
         else{
+          investorAmount = (newBalance*investorPercentage)/10000;
+        }
 
-         uint256 investorAmount = (newBalance*investorPercentage)/10000;
          investorWallet.transfer(investorAmount);
          amountDistributedToInvestors = amountDistributedToInvestors + investorAmount;
          uint256 amountLeft = newBalance-investorAmount;
          teamWallet.transfer(amountLeft);
          amountDistributedToTeam = amountDistributedToTeam + amountLeft;
-        }
 
     }
 
