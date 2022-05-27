@@ -526,17 +526,18 @@ contract TaxDistributionContrac is  Ownable {
         
 
     function calcPairSwap(uint256 amountA) public view returns(uint256 priceImpact) {
-        if(reverse == true){
         (uint256 reserveA, uint256 reserveB,) = pairContract.getReserves();
-        uint256 amountB =  uniswapV2Router.getAmountOut(amountA, reserveB, reserveA);
-        priceImpact = (reserveA-(reserveA-(amountB)))*(10000) / reserveA;
+        uint256 reserve;
+        uint256 amountB;
+        if(reverse == true){
+        reserve = reserveA;
+        amountB =  uniswapV2Router.getAmountOut(amountA, reserveB, reserveA);
         }
         else{
-        (uint256 reserveA, uint256 reserveB,) = pairContract.getReserves();
-        uint256 amountB =  uniswapV2Router.getAmountOut(amountA, reserveA, reserveB);
-        priceImpact =  (reserveB-(reserveB-(amountB)))*(10000) / reserveB;
-
+        reserve = reserveB;
+        amountB =  uniswapV2Router.getAmountOut(amountA, reserveA, reserveB);
         }
+        unchecked {priceImpact =  (reserve-(reserve-(amountB)))*(10000) / reserve;}
         return( priceImpact);    
     }
 
@@ -553,7 +554,7 @@ contract TaxDistributionContrac is  Ownable {
         uint256 newBalance = address(this).balance-(initialBalance);
         uint256 investorAmount;
         if(amountDistributedToInvestors <= investorAmountThreshold){
-          investorAmount = (newBalance*initialInvestorPercentage)/10000;
+        unchecked { investorAmount = (newBalance*initialInvestorPercentage)/10000;}
          
         }
         else{
