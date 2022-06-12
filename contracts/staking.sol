@@ -93,13 +93,15 @@ contract StakingPlatform is Ownable, ReentrancyGuard {
         uint256 _duration,
         uint _maxAmountStaked,
         address pair,
-        address oracle
+        address oracle,
+        uint256 holdingPeriod
     ) {
         stakingDuration = _duration;
         token = IERC20(_token);
         APY = _APY;
         stakingMax = _maxAmountStaked;
         startPeriod = block.timestamp;
+        lockupPeriod = holdingPeriod;
         endPeriod = block.timestamp + stakingDuration;
         pairContract = IUniswapV2Pair(pair);
           ETHPrice = IETHPrice(oracle);
@@ -316,7 +318,7 @@ contract StakingPlatform is Ownable, ReentrancyGuard {
     
     function withdrawAll() external {
         require(
-            block.timestamp >= lockupPeriod,
+            block.timestamp >= _userLastTime[msg.sender] + lockupPeriod,
             "No withdraw until lockup ends"
         );
 
@@ -365,6 +367,10 @@ contract StakingPlatform is Ownable, ReentrancyGuard {
      * Cannot claim initial stakeholders deposit
      */
     function withdrawResidualBalance() external onlyOwner {
+        require(
+            endPeriod < block.timestamp,
+            "Staking period not ended"
+        );
         uint256 balance = token.balanceOf(address(this));
         uint256 residualBalance = balance - (_totalStaked);
         require(residualBalance > 0, "No residual Balance to withdraw");
@@ -428,7 +434,7 @@ contract StakingPlatform is Ownable, ReentrancyGuard {
         view
         returns (uint256)
     {
-        if (startPeriod == 0 || staked[stakeHolder] == 0) {
+        if (staked[stakeHolder] == 0) {
             return 0;
         }
 
@@ -444,19 +450,17 @@ contract StakingPlatform is Ownable, ReentrancyGuard {
         view
         returns (uint256)
     {
-        bool early = startPeriod > _userStartTime[stakeHolder];
+    
         uint256 startTime;
         if (endPeriod > block.timestamp) {
-            startTime = early ? startPeriod : _userStartTime[stakeHolder];
+            startTime = _userStartTime[stakeHolder];
             uint256 timeRemaining = stakingDuration -
                 (block.timestamp - startTime);
             return
                 (_precision * (stakingDuration - timeRemaining)) /
                 stakingDuration;
         }
-        startTime = early
-            ? 0
-            : stakingDuration - (endPeriod - _userStartTime[stakeHolder]);
+        startTime = stakingDuration - (endPeriod - _userStartTime[stakeHolder]);
         return (_precision * (stakingDuration - startTime)) / stakingDuration;
     }
 
