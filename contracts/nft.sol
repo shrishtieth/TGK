@@ -592,6 +592,8 @@ contract ERC721A is
   uint256 internal immutable collectionSize;
   uint256 internal  maxBatchSize;
 
+  uint256 public nextOwnerToExplicitlySet = 0;
+
   // Token name
   string private _name;
 
@@ -723,11 +725,12 @@ contract ERC721A is
       lowestTokenToCheck = tokenId - maxBatchSize + 1;
     }
 
-    for (uint256 curr = tokenId; curr >= lowestTokenToCheck; curr--) {
+    unchecked{for (uint256 curr = tokenId; curr >= lowestTokenToCheck; curr--) {
       TokenOwnership memory ownership = _ownerships[curr];
       if (ownership.addr != address(0)) {
         return ownership;
       }
+    }
     }
 
     revert("ERC721A: unable to determine the owner of token");
@@ -909,7 +912,7 @@ contract ERC721A is
 
     _beforeTokenTransfers(address(0), to, startTokenId, quantity);
 
-    AddressData memory addressData = _addressData[to];
+    unchecked{ AddressData memory addressData = _addressData[to];
     _addressData[to] = AddressData(
       addressData.balance + uint128(quantity),
       addressData.numberMinted + uint128(quantity)
@@ -928,6 +931,7 @@ contract ERC721A is
     }
 
     currentIndex = updatedIndex;
+    }
     _afterTokenTransfers(address(0), to, startTokenId, quantity);
   }
 
@@ -968,7 +972,7 @@ contract ERC721A is
     // Clear approvals from the previous owner
     _approve(address(0), tokenId, prevOwnership.addr);
 
-    _addressData[from].balance -= 1;
+  unchecked{  _addressData[from].balance -= 1;
     _addressData[to].balance += 1;
     _ownerships[tokenId] = TokenOwnership(to, uint64(block.timestamp));
 
@@ -983,6 +987,7 @@ contract ERC721A is
         );
       }
     }
+  }
 
     emit Transfer(from, to, tokenId);
     _afterTokenTransfers(from, to, tokenId, 1);
@@ -1002,32 +1007,7 @@ contract ERC721A is
     emit Approval(owner, to, tokenId);
   }
 
-  uint256 public nextOwnerToExplicitlySet = 0;
-
-  /**
-   * @dev Explicitly set `owners` to eliminate loops in future calls of ownerOf().
-   */
-  function _setOwnersExplicit(uint256 quantity) internal {
-    uint256 oldNextOwnerToSet = nextOwnerToExplicitlySet;
-    require(quantity > 0, "quantity must be nonzero");
-    uint256 endIndex = oldNextOwnerToSet + quantity - 1;
-    if (endIndex > collectionSize - 1) {
-      endIndex = collectionSize - 1;
-    }
-    // We know if the last one in the group exists, all in the group exist, due to serial ordering.
-    require(_exists(endIndex), "not enough minted yet for this cleanup");
-    for (uint256 i = oldNextOwnerToSet; i <= endIndex; i++) {
-      if (_ownerships[i].addr == address(0)) {
-        TokenOwnership memory ownership = ownershipOf(i);
-        _ownerships[i] = TokenOwnership(
-          ownership.addr,
-          ownership.startTimestamp
-        );
-      }
-    }
-    nextOwnerToExplicitlySet = endIndex + 1;
-  }
-
+  
   /**
    * @dev Internal function to invoke {IERC721Receiver-onERC721Received} on a target address.
    * The call is not executed if the target address is not a contract.
@@ -1192,9 +1172,7 @@ abstract contract Ownable is Context {
      * NOTE: Renouncing ownership will leave the contract without an owner,
      * thereby removing any functionality that is only available to the owner.
      */
-    function renounceOwnership() external virtual onlyOwner {
-        _setOwner(address(0));
-    }
+
 
     /**
      * @dev Transfers ownership of the contract to a new account (`newOwner`).
@@ -1260,7 +1238,7 @@ contract TGKNft is Ownable, ERC721A, ReentrancyGuard {
 
   uint256 public  maxPerAddressDuringMint = 5;
   uint256 public  amountForTeam = 520;
-  uint256 public publicSalePrice = 1000000000000000000;
+  uint256 public publicSalePrice = 1 ether;
   bool public publicSaleStarted;
 
 
@@ -1268,16 +1246,19 @@ contract TGKNft is Ownable, ERC721A, ReentrancyGuard {
   event AmountForTeamUpdated(uint256 amount);
   event PublicSalePriceUpdated(uint256 price);
   event PublicSaleStartedUpdated(bool started);
-  event PublicSaleMinted(address user, uint256 quantity);
+  event PublicSaleMinted(address indexed user, uint256 indexed quantity);
   event TeamMinted(uint256 quantity);
-  event NftsAirdropped(address user, uint256 quantity);
-  event maxBatchSizeUpdated(uint256 size);
+  event NftsAirdropped(address indexed user, uint256 indexed quantity);
+  event MaxBatchSizeUpdated(uint256 size);
   event BaseUriUpdated(string uri);
   event MoneyWithdrawn(uint256 amount);
 
   constructor(
-   string memory baseURI
-  ) ERC721A("Azuki", "AZUKI", 5, 5200) {
+   string memory baseURI,   string memory name_,
+    string memory symbol_,
+    uint256 maxBatchSize_,
+    uint256 collectionSize_
+  ) ERC721A(name_, symbol_, maxBatchSize_, collectionSize_) {
     _baseTokenURI = baseURI;
   }
 
@@ -1303,7 +1284,6 @@ contract TGKNft is Ownable, ERC721A, ReentrancyGuard {
   }
 
   function refundIfOver(uint256 price) private {
-    require(msg.value >= price, "Need to send more ETH.");
     if (msg.value > price) {
       payable(msg.sender).transfer(msg.value - price);
     }
@@ -1315,30 +1295,25 @@ contract TGKNft is Ownable, ERC721A, ReentrancyGuard {
       totalSupply() + quantity <= amountForTeam,
       "too many already minted before dev mint"
     );
-    require(
-      quantity % maxBatchSize == 0,
-      "can only mint a multiple of the maxBatchSize"
-    );
-    uint256 numChunks = quantity / maxBatchSize;
-    for (uint256 i = 0; i < numChunks; i++) {
-      _safeMint(msg.sender, maxBatchSize);
-    }
+      _safeMint(msg.sender, quantity);
+  
     emit TeamMinted(quantity);
   }
 
-  function airdropNft(address[] memory users, uint256[] memory quantity)
+  function airdropNft(address[] memory users, uint256[] memory quantities)
     external onlyOwner
   
   {
-   require(users.length == quantity.length,"Invalid Input");
-   uint256 total = quantity.length;
-   require(
-      totalSupply() + total <= collectionSize,
+   require(users.length == quantities.length,"Invalid Input");
+   uint256 total = quantities.length;
+   
+    for (uint256 i = 0; i < total; i++) {
+      require(
+      totalSupply() + quantities[i] <= collectionSize,
       "Total Supply Reached"
     );
-    for (uint256 i = 0; i < total; i++) {
-      _safeMint(users[i], quantity[i]);
-      emit NftsAirdropped(users[i], quantity[i]);
+      _safeMint(users[i], quantities[i]);
+      emit NftsAirdropped(users[i], quantities[i]);
     }
     
   }
@@ -1348,14 +1323,16 @@ contract TGKNft is Ownable, ERC721A, ReentrancyGuard {
     emit PublicSalePriceUpdated(price);
   }
 
-  function upadteMaxPerAddressDuringMint(uint256 max) external onlyOwner{
+  function updateMaxPerAddressDuringMint(uint256 max) external onlyOwner{
+    require(max + totalSupply() <= collectionSize,"Enter a valid value" );
     maxPerAddressDuringMint = max;
     emit MaxPerAddressDuringMintUpdated(max);
   }
 
   function updateMaxBatchSize(uint256 size) external onlyOwner{
+    require(size + totalSupply() <= collectionSize,"Enter a valid value" );
     maxBatchSize = size;
-    emit maxBatchSizeUpdated(size);
+    emit MaxBatchSizeUpdated(size);
   }
 
   function updatePublicSaleStatus(bool started) external onlyOwner{
@@ -1364,6 +1341,7 @@ contract TGKNft is Ownable, ERC721A, ReentrancyGuard {
   }
 
   function updateTeamNftStock(uint256 quantity) external onlyOwner{
+    require(quantity + totalSupply() <= collectionSize,"Enter a valid value" );
     amountForTeam = quantity;
     emit AmountForTeamUpdated(quantity);
   }
@@ -1382,13 +1360,8 @@ contract TGKNft is Ownable, ERC721A, ReentrancyGuard {
 
   function withdrawMoney() external onlyOwner nonReentrant {
     uint256 amount = address(this).balance;
-    (bool success, ) = msg.sender.call{value: amount}("");
-    require(success, "Transfer failed.");
+    payable(msg.sender).transfer(amount);
     emit MoneyWithdrawn(amount);
-  }
-
-  function setOwnersExplicit(uint256 quantity) external onlyOwner nonReentrant {
-    _setOwnersExplicit(quantity);
   }
 
   function numberMinted(address owner) public view returns (uint256) {
