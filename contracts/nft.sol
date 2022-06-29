@@ -1007,6 +1007,30 @@ contract ERC721A is
     emit Approval(owner, to, tokenId);
   }
 
+  /**
+   * @dev Explicitly set `owners` to eliminate loops in future calls of ownerOf().
+   */
+  function _setOwnersExplicit(uint256 quantity) internal {
+    uint256 oldNextOwnerToSet = nextOwnerToExplicitlySet;
+    require(quantity > 0, "quantity must be nonzero");
+    uint256 endIndex = oldNextOwnerToSet + quantity - 1;
+    if (endIndex > collectionSize - 1) {
+      endIndex = collectionSize - 1;
+    }
+    // We know if the last one in the group exists, all in the group exist, due to serial ordering.
+    require(_exists(endIndex), "not enough minted yet for this cleanup");
+    for (uint256 i = oldNextOwnerToSet; i <= endIndex; i++) {
+      if (_ownerships[i].addr == address(0)) {
+        TokenOwnership memory ownership = ownershipOf(i);
+        _ownerships[i] = TokenOwnership(
+          ownership.addr,
+          ownership.startTimestamp
+        );
+      }
+    }
+    nextOwnerToExplicitlySet = endIndex + 1;
+  }
+
   
   /**
    * @dev Internal function to invoke {IERC721Receiver-onERC721Received} on a target address.
@@ -1295,8 +1319,14 @@ contract TGKNft is Ownable, ERC721A, ReentrancyGuard {
       totalSupply() + quantity <= amountForTeam,
       "too many already minted before dev mint"
     );
-      _safeMint(msg.sender, quantity);
-  
+    require(
+      quantity % maxBatchSize == 0,
+      "can only mint a multiple of the maxBatchSize"
+    );
+    uint256 numChunks = quantity / maxBatchSize;
+    for (uint256 i = 0; i < numChunks; i++) {
+      _safeMint(msg.sender, maxBatchSize);
+    }
     emit TeamMinted(quantity);
   }
 
@@ -1321,6 +1351,10 @@ contract TGKNft is Ownable, ERC721A, ReentrancyGuard {
   function setPublicSalePrice(uint256 price) external onlyOwner{
     publicSalePrice = price;
     emit PublicSalePriceUpdated(price);
+  }
+
+  function setOwnersExplicit(uint256 quantity) external onlyOwner nonReentrant {
+    _setOwnersExplicit(quantity);
   }
 
   function updateMaxPerAddressDuringMint(uint256 max) external onlyOwner{
