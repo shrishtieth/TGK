@@ -1358,13 +1358,13 @@ contract TGKNft is Ownable, ERC721A, ReentrancyGuard {
   }
 
   function updateMaxPerAddressDuringMint(uint256 max) external onlyOwner{
-    require(max + totalSupply() <= collectionSize,"Enter a valid value" );
+    require(max <= collectionSize,"Enter a valid value" );
     maxPerAddressDuringMint = max;
     emit MaxPerAddressDuringMintUpdated(max);
   }
 
   function updateMaxBatchSize(uint256 size) external onlyOwner{
-    require(size + totalSupply() <= collectionSize,"Enter a valid value" );
+    require(size <= collectionSize,"Enter a valid value" );
     maxBatchSize = size;
     emit MaxBatchSizeUpdated(size);
   }
