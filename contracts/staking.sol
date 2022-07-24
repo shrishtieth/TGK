@@ -43,7 +43,11 @@ contract StakingPlatform is Ownable, ReentrancyGuard {
     uint256 public lockupPeriod;
     uint256 public endPeriod;
 
-    uint256 private _totalStaked;
+    uint256 public rewarded;
+    address[] public stakers;
+    mapping(address => bool) public hasStaked;
+
+    uint256 public _totalStaked;
     uint256 internal _precision = 1E6;
 
     mapping(address => uint256) public staked;
@@ -82,6 +86,7 @@ contract StakingPlatform is Ownable, ReentrancyGuard {
     event LockUpPeriodUpdated(uint256 period);
     event MaxStakeUpdated(uint256 max);
     event PrecisionUpdated(uint256 precision);
+    event RewardsStaked(address user, uint256 amount);
 
     /**
      * @notice constructor contains all the parameters of the staking platform
@@ -254,6 +259,10 @@ contract StakingPlatform is Ownable, ReentrancyGuard {
             "Amount staked exceeds MaxStake"
         );
         require(amount > 0, "Amount must be greater than 0");
+        if(hasStaked[_msgSender()] == false ){
+            stakers.push(_msgSender());
+            hasStaked[_msgSender()] = true;
+        }
 
         if (_userStartTime[_msgSender()] == 0) {
             _userStartTime[_msgSender()] = block.timestamp;
@@ -423,6 +432,36 @@ contract StakingPlatform is Ownable, ReentrancyGuard {
         _claimRewards();
     }
 
+    function stakeReward() external {
+        _rewardsToClaim[_msgSender()] = _calculateRewards(_msgSender());
+        _userStartTime[_msgSender()] = (block.timestamp >= endPeriod)
+            ? endPeriod
+            : block.timestamp;
+        uint256 rewardsToClaim = _rewardsToClaim[_msgSender()];
+        require(rewardsToClaim > 0, "Nothing to claim");
+        _rewardsToClaim[_msgSender()] = 0;
+        rewarded += rewardsToClaim;
+        token.safeTransfer(address(this), rewardsToClaim);
+        require(
+            _totalStaked + rewardsToClaim <= stakingMax,
+            "Amount staked exceeds MaxStake"
+        );
+
+        if (_userStartTime[_msgSender()] == 0) {
+            _userStartTime[_msgSender()] = block.timestamp;
+        }
+
+        _userLastTime[msg.sender] = block.timestamp;
+
+        _updateRewards();
+
+        staked[_msgSender()] += rewardsToClaim;
+        _totalStaked += rewardsToClaim;
+
+        emit RewardsStaked(_msgSender(), rewardsToClaim);
+
+    }
+
     /**
      * @notice calculate rewards based on the `APY`, `_percentageTimeRemaining()`
      * @dev the higher is the precision and the more the time remaining will be precise
@@ -471,6 +510,7 @@ contract StakingPlatform is Ownable, ReentrancyGuard {
         require(rewardsToClaim > 0, "Nothing to claim");
 
         _rewardsToClaim[_msgSender()] = 0;
+        rewarded += rewardsToClaim;
         token.safeTransfer(_msgSender(), rewardsToClaim);
         emit Claim(_msgSender(), rewardsToClaim);
     }
