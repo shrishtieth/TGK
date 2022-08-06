@@ -60,10 +60,13 @@ contract StakingPlatform is Ownable, ReentrancyGuard {
     uint256 public _index;
 
     uint256 public minimumStakingPrice = 4700000000000000000;
-    uint256 public basicPrice = 5000000000000000000;
+    uint256 public classicPrice = 5000000000000000000;
     uint256 public silverPrice = 10000000000000000000;
     uint256 public goldPrice = 15000000000000000000;
     uint256 public diamondPrice = 20000000000000000000;
+
+    mapping(string => uint256) public tierUserLimit;
+    mapping(string => uint256) public tierUsers;
 
 
     event Deposit(address indexed owner, uint256 amount);
@@ -73,7 +76,7 @@ contract StakingPlatform is Ownable, ReentrancyGuard {
     event ResidualWithdraw(uint256 amount);
     event StartStaking(uint256 startPeriod, uint256 endingPeriod);
     event minimumStakingPriceUpdated(uint256 amount);
-    event BasicPriceUpdated(uint256 price);
+    event classicPriceUpdated(uint256 price);
     event SilverPriceUpdated(uint256 price);
     event GoldPriceUpdated(uint256 price);
     event DiamondPriceUpdated(uint256 price);
@@ -87,6 +90,7 @@ contract StakingPlatform is Ownable, ReentrancyGuard {
     event MaxStakeUpdated(uint256 max);
     event PrecisionUpdated(uint256 precision);
     event RewardsStaked(address user, uint256 amount);
+    event UserLimitUpdated(string level, uint256 limit);
 
     /**
      * @notice constructor contains all the parameters of the staking platform
@@ -112,6 +116,11 @@ contract StakingPlatform is Ownable, ReentrancyGuard {
           ETHPrice = IETHPrice(oracle);
         (address token0, ) = (pairContract.token0(), pairContract.token1());
         _index = _token == token0 ? 0 : 1;
+        tierUserLimit["classic"] = 2000;
+        tierUserLimit["silver"] = 1000;
+        tierUserLimit["gold"] = 500;
+        tierUserLimit["diamond"] = 200;
+
         emit StartStaking(startPeriod,  endPeriod);
        
     }
@@ -124,11 +133,18 @@ contract StakingPlatform is Ownable, ReentrancyGuard {
 
     }
     
-    function UpdateBasicPrice(uint256 price) external onlyOwner{
+    function UpdateclassicPrice(uint256 price) external onlyOwner{
        
-       basicPrice = price;
-       emit BasicPriceUpdated (price);
+       classicPrice = price;
+       emit classicPriceUpdated (price);
        
+    }
+
+    function updateUserLimit(string memory level, uint256 limit) external onlyOwner{
+
+        tierUserLimit[level] = limit;
+        emit UserLimitUpdated(level, limit);
+
     }
 
     function UpdateSilverPrice(uint256 price) external onlyOwner{
@@ -235,9 +251,9 @@ contract StakingPlatform is Ownable, ReentrancyGuard {
 
 
 
-    function getUserLevel(address user) external view returns(string memory level){
+    function getUserLevel(address user) public view returns(string memory level){
         if(staked[user]>=getTokensFromPrice(minimumStakingPrice) && staked[user]<getTokensFromPrice(silverPrice)){
-            return("Basic");
+            return("classic");
         }
         else if(staked[user]>=getTokensFromPrice(silverPrice) && staked[user]<getTokensFromPrice(goldPrice))
             return("Silver");
@@ -247,6 +263,9 @@ contract StakingPlatform is Ownable, ReentrancyGuard {
             return("Diamond");
     }
 
+    function getStakers() external view returns(uint256 length){
+        return(stakers.length);
+    }
    
     function deposit(uint256 amount) external {
         require(amount >= getTokensFromPrice(minimumStakingPrice),"Amount Too Low");
@@ -275,7 +294,14 @@ contract StakingPlatform is Ownable, ReentrancyGuard {
         staked[_msgSender()] += amount;
         _totalStaked += amount;
         token.safeTransferFrom(_msgSender(), address(this), amount);
+        string memory level = getUserLevel(_msgSender());
+        tierUsers[level] += 1;
+        require(tierUserLimit[level] >= tierUsers[level],"User limit Exceeded");
         emit Deposit(_msgSender(), amount);
+    }
+
+    function canWithdrawWithoutFees(address user) external view returns(bool){
+        return(block.timestamp >= _userLastTime[user] + lockupPeriod);
     }
 
    
@@ -289,6 +315,8 @@ contract StakingPlatform is Ownable, ReentrancyGuard {
             amount <= staked[_msgSender()],
             "Amount higher than stakedAmount"
         );
+        string memory level = getUserLevel(_msgSender());
+        tierUsers[level] -= 1;
 
         _updateRewards();
         if (_rewardsToClaim[_msgSender()] > 0) {
@@ -297,6 +325,8 @@ contract StakingPlatform is Ownable, ReentrancyGuard {
         _totalStaked -= amount;
         staked[_msgSender()] -= amount;
         token.safeTransfer(_msgSender(), amount);
+        string memory newLevel = getUserLevel(_msgSender());
+        tierUsers[newLevel] += 1;
 
         emit Withdraw(_msgSender(), amount);
     }
@@ -311,6 +341,8 @@ contract StakingPlatform is Ownable, ReentrancyGuard {
             amount <= staked[_msgSender()],
             "Amount higher than stakedAmount"
         );
+        string memory level = getUserLevel(_msgSender());
+        tierUsers[level] -= 1;
 
         _updateRewards();
         if (_rewardsToClaim[_msgSender()] > 0) {
@@ -320,6 +352,8 @@ contract StakingPlatform is Ownable, ReentrancyGuard {
         staked[_msgSender()] -= amount;
         uint256 _fees = amount*fees/10000;
         token.safeTransfer(_msgSender(), amount - _fees);
+        string memory newLevel = getUserLevel(_msgSender());
+        tierUsers[newLevel] += 1;
 
         emit WithdrawAndFeesPaid(_msgSender(), amount - _fees, _fees);
     }
@@ -330,6 +364,8 @@ contract StakingPlatform is Ownable, ReentrancyGuard {
             block.timestamp >= _userLastTime[msg.sender] + lockupPeriod,
             "No withdraw until lockup ends"
         );
+        string memory level = getUserLevel(_msgSender());
+        tierUsers[level] -= 1;
 
         _updateRewards();
         if (_rewardsToClaim[_msgSender()] > 0) {
@@ -351,6 +387,8 @@ contract StakingPlatform is Ownable, ReentrancyGuard {
             block.timestamp <= _userLastTime[msg.sender] + lockupPeriod,
             "Already Unlocked"
         );
+        string memory level = getUserLevel(_msgSender());
+        tierUsers[level] -= 1;
 
         _updateRewards();
         if (_rewardsToClaim[_msgSender()] > 0) {
@@ -457,6 +495,10 @@ contract StakingPlatform is Ownable, ReentrancyGuard {
 
         staked[_msgSender()] += rewardsToClaim;
         _totalStaked += rewardsToClaim;
+
+        string memory level = getUserLevel(_msgSender());
+        tierUsers[level] += 1;
+        require(tierUserLimit[level] >= tierUsers[level],"User limit Exceeded");
 
         emit RewardsStaked(_msgSender(), rewardsToClaim);
 
