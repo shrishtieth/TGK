@@ -587,7 +587,7 @@ contract ERC721A is
     uint128 numberMinted;
   }
 
-  uint256 private currentIndex = 0;
+  uint256 private currentIndex = 1;
 
   uint256 internal immutable collectionSize;
   uint256 internal  maxBatchSize;
@@ -639,7 +639,12 @@ contract ERC721A is
    * @dev See {IERC721Enumerable-totalSupply}.
    */
   function totalSupply() public view override returns (uint256) {
-    return currentIndex;
+    if(currentIndex == 1){
+      return(0);
+    }
+    else{
+    return currentIndex -1;
+    }
   }
 
   /**
@@ -881,6 +886,7 @@ contract ERC721A is
    * Tokens start existing when they are minted (`_mint`),
    */
   function _exists(uint256 tokenId) internal view returns (bool) {
+    require(tokenId > 0, "Token 0 doesn't exists");
     return tokenId < currentIndex;
   }
 
@@ -912,7 +918,7 @@ contract ERC721A is
 
     _beforeTokenTransfers(address(0), to, startTokenId, quantity);
 
-    unchecked{ AddressData memory addressData = _addressData[to];
+    AddressData memory addressData = _addressData[to];
     _addressData[to] = AddressData(
       addressData.balance + uint128(quantity),
       addressData.numberMinted + uint128(quantity)
@@ -931,7 +937,6 @@ contract ERC721A is
     }
 
     currentIndex = updatedIndex;
-    }
     _afterTokenTransfers(address(0), to, startTokenId, quantity);
   }
 
