@@ -3,7 +3,7 @@
 */
 
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.19;
+pragma solidity 0.8.17;
 library SafeMath {
 	/**
 	 * @dev Returns the addition of two unsigned integers, with an overflow flag.
@@ -768,16 +768,15 @@ contract CryptoGradICO is Ownable, ReentrancyGuard {
 	using SafeERC20
 	for IERC20;
 
-	uint256 public startime = 1695643200;
-	uint256 public endTime = 1711843200;
-	uint256 public affiliatePercentage = 1500;
-	uint256 public unlockPrice;
-	uint256 public tokenPrice;
+	uint256 public startime = 0;
+	uint256 public endTime = 17039340130000;
+	uint256 public unlockPrice = 500000000000000000000;
+	uint256 public tokenPrice = 12500000;
 	uint256 public amountRaised;
 	uint256 public tokensSold;
-	uint256 public tokenSupply;
-	address public usdc = 0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d;
-	address public usdt = 0x55d398326f99059fF775485246999027B3197955;
+	uint256 public tokenSupply = 100000000000000000000000000;
+	address public usdc = 0x11646309503424e4C42379dFB93110c74B9d351E;
+	address public usdt = 0x45EA3e2a5b7C04960ce5281E2c7F20823fe6b5E1;
 	address public weth = 0x55d398326f99059fF775485246999027B3197955;
 
 	address[] public investors;
@@ -790,12 +789,11 @@ contract CryptoGradICO is Ownable, ReentrancyGuard {
 	IUSDTPrice public usdtPrice;
 	IUSDCPrice public usdcPrice;
 
-
 	mapping(address => address) public referedBy;
     mapping(address => address[]) public getRefrees;
 
-	uint256 public minBuyAmount = 50000000000000000000;
-	uint256 public maxBuyAmount = 50000000000000000000000;
+	uint256 public minBuyAmount = 500000000000000000000;
+	uint256 public maxBuyAmount = 5000000000000000000000000000000000;
 
 	mapping(uint256 => uint256) public levelToCommision;
 	mapping(address => bool) public added;
@@ -825,6 +823,10 @@ contract CryptoGradICO is Ownable, ReentrancyGuard {
 		levelToCommision[5] = 75;
 		levelToCommision[6] = 50;
 		levelToCommision[7] = 25;
+
+		ethPrice = IETHPrice(0x65c2F0f7690e07de0C1b79afc06a74e85B3f2ca7);
+		usdtPrice = IUSDTPrice(0x7CE501F6aa9614bD7E362846b82aC29636306152);
+		usdcPrice = IUSDCPrice(0x6BdF15fD0b8CCC45f7Ee2c491B50D75B121aA873);
 		
 
 	}
@@ -836,6 +838,26 @@ contract CryptoGradICO is Ownable, ReentrancyGuard {
 
 	}
 
+	function getPrice() external view returns(int256 eth, int256 usdtp, int256 usdcp){
+      eth = ethPrice.getLatestPrice();
+	  usdtp = usdtPrice.getLatestPrice();
+	  usdcp = usdcPrice.getLatestPrice();
+
+	}
+
+	function getTokenAmount(uint256 amount, address token) external view returns(uint256 tokens){
+		uint256 _currencyPrice;
+		if(token == weth){
+		 _currencyPrice = uint256(ethPrice.getLatestPrice());
+		}
+		else if(token == usdc){
+		 _currencyPrice = uint256(usdcPrice.getLatestPrice());
+		}
+		else if(token == usdt){
+		 _currencyPrice = uint256(usdtPrice.getLatestPrice());
+		}
+		tokens = (amount * _currencyPrice) / tokenPrice;
+	}
 	
 	function updateWallet(address _treasury) external onlyOwner {
 		treasury = _treasury;
@@ -865,7 +887,7 @@ contract CryptoGradICO is Ownable, ReentrancyGuard {
 	}
 
 
-	function buyToken(address token, uint256 amount, address referrer) external payable nonReentrant {
+	function buyToken(address token, uint256 amount, address referrer) external payable   {
 		if (!added[msg.sender]) {
 			investors.push(msg.sender);
 			added[msg.sender] = true;
@@ -887,14 +909,12 @@ contract CryptoGradICO is Ownable, ReentrancyGuard {
 		else if(token == usdt){
 		 _currencyPrice = uint256(usdtPrice.getLatestPrice());
 		}
-		uint256 tokenAmount = (amount * (10 ** 18) * _currencyPrice) / tokenPrice;
-		require(amount >= minBuyAmount, "Cannot buy less than minimum Buy Amount"); 
-		require(amount <= maxBuyAmount, "Cannot buy more than Max Buy Amount");
+		uint256 tokenAmount = (amount * _currencyPrice) / tokenPrice;
 		
 			tokensSold += tokenAmount;
 			require(tokensSold <= tokenSupply, "Sold Out");
 			amountRaised += amount * _currencyPrice;
-			
+			 
 			if(token == weth){
                distributeRevenueEth(amount, msg.sender, _currencyPrice);
 			}
@@ -902,15 +922,14 @@ contract CryptoGradICO is Ownable, ReentrancyGuard {
                distributeRevenue(amount, msg.sender, token, _currencyPrice);
 			}
 			
-			
 
-		usdInvestedByUser[msg.sender] += amount * _currencyPrice;
+		usdInvestedByUser[msg.sender] += (amount * _currencyPrice) / 10 ** 8;
 		tokenBoughtUser[msg.sender] += tokenAmount;
-		emit TokensBought(msg.sender, amount * _currencyPrice, token, tokenAmount);
+		emit TokensBought(msg.sender, (amount * _currencyPrice) / 10 ** 8, token, tokenAmount);
 
 	}
 
-	function distributeRevenue(uint256 amount, address user, address token, uint256 _tokenPrice) private {
+	function distributeRevenue(uint256 amount, address user, address token, uint256 _tokenPrice) public  {
 
 		uint totalItemCount = 7;
 		address _user = user;
@@ -919,7 +938,7 @@ contract CryptoGradICO is Ownable, ReentrancyGuard {
 			if (referedBy[_user] != address(0)) {
 					if (getLevelsUnlocked(referedBy[_user]) >= i) {
 						userRewardBalance[referedBy[_user]][token] += amount * (levelToCommision[i]) / 10000;
-						referalIncome[referedBy[_user]] += amount * _tokenPrice *(levelToCommision[i]) / 10000;
+						referalIncome[referedBy[_user]] += amount * _tokenPrice *(levelToCommision[i]) / 10 ** 12;
 						emit ReferalIncomeDistributed(user, referedBy[_user], amount , amount * (levelToCommision[i]) / 10000, token, i);
 						total += amount * (levelToCommision[i]) / 10000;
 					}
@@ -930,13 +949,17 @@ contract CryptoGradICO is Ownable, ReentrancyGuard {
 			}
 		}
         
-		IERC20(token).safeTransferFrom(user, address(this), total);
-		IERC20(token).safeTransferFrom(user, treasury, amount - total);
+		// if(total > 0){
+        // IERC20(token).safeTransferFrom(user, address(this), total);
+		// }
+		
+		// IERC20(token).safeTransferFrom(user, treasury, amount - total);
 		
 	}
+	
 
 
-	function distributeRevenueEth(uint256 amount, address user, uint256 _tokenPrice) private{
+	function distributeRevenueEth(uint256 amount, address user, uint256 _tokenPrice) public payable{
 
         uint totalItemCount = 7;
 		uint256 total;
@@ -945,7 +968,7 @@ contract CryptoGradICO is Ownable, ReentrancyGuard {
 			if (referedBy[_user] != address(0)) {
 					if (getLevelsUnlocked(referedBy[_user]) >= i) {
 						userRewardBalance[referedBy[_user]][weth] += amount * (levelToCommision[i]) / 10000;
-						referalIncome[referedBy[_user]] += amount * _tokenPrice * (levelToCommision[i]) / 10000;
+						referalIncome[referedBy[_user]] += amount * _tokenPrice * (levelToCommision[i]) / 10 ** 12;
 						emit ReferalIncomeDistributed(user, referedBy[_user], amount , amount * (levelToCommision[i]) / 10000, weth, i);
 						total += amount * (levelToCommision[i]) / 10000;
 					}
